@@ -1,0 +1,242 @@
+// This is the Prisma schema for the ms-core microservice.
+// It uses the 'app' schema in PostgreSQL (separate from 'identity' used by ms-auth)
+// following the LOPDP separation principle defined in CENTINELA_MER_Seguridad.md
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  moduleFormat    = "cjs"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  schemas    = ["app"]
+  extensions = [postgis]
+}
+
+/// Zonas geoespaciales de los sectores de Milagro
+model Zona {
+  id          String  @id @default(uuid()) @db.Uuid
+  nombre      String  @db.VarChar(100)
+  descripcion String? @db.Text
+  geom        Unsupported("geometry")
+  riesgoNivel Int     @default(1) @map("riesgo_nivel") @db.SmallInt
+  activa      Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  nodos            Nodo[]
+  eventos          Evento[]
+  reportes         Reporte[]
+  alertas          Alerta[]
+  rutasPatrullaje  RutaPatrullaje[]
+
+  @@index([activa])
+  @@map("zonas")
+  @@schema("app")
+}
+
+/// Nodos IoT físicos (micrófonos INMP441) desplegados en campo
+model Nodo {
+  id          String  @id @default(uuid()) @db.Uuid
+  codigo      String  @unique @db.VarChar(50)
+  descripcion String? @db.Text
+  ubicacion   Unsupported("geometry")
+  zonaId      String  @map("zona_id") @db.Uuid
+  zona        Zona    @relation(fields: [zonaId], references: [id])
+
+  versionFw       String?   @map("version_fw") @db.VarChar(50)
+  certFingerprint String?   @map("cert_fingerprint") @db.Char(64)
+  ultimoHeartbeat DateTime? @map("ultimo_heartbeat") @db.Timestamptz(6)
+
+  /// activo | inactivo | mantenimiento
+  estado String  @default("activo") @db.VarChar(20)
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  eventos Evento[]
+
+  @@index([zonaId])
+  @@index([estado])
+  @@map("nodos")
+  @@schema("app")
+}
+
+/// Eventos de detección: audio IoT o manual de operador
+model Evento {
+  id      String @id @default(uuid()) @db.Uuid
+
+  /// audio | manual | ciudadano
+  tipo    String @db.VarChar(20)
+
+  /// disparo | grito | fuego_artificial | petardo | moto_sin_silenciador | otro
+  subtipo String? @db.VarChar(50)
+
+  ubicacion Unsupported("geometry")? // Coordenadas del nodo al momento del evento
+  
+  nodoId String? @map("nodo_id") @db.Uuid
+  nodo   Nodo?   @relation(fields: [nodoId], references: [id])
+
+  zonaId String? @map("zona_id") @db.Uuid
+  zona   Zona?   @relation(fields: [zonaId], references: [id])
+
+  confianza  Decimal? @db.Decimal(5, 4) // 0.0000 - 1.0000 (score del modelo YAMNet)
+  severidad  Int      @default(1) @db.SmallInt // 1=baja, 2=media, 3=alta, 4=crítica
+
+  /// yamnet | operador | app_ciudadana
+  fuente   String  @db.VarChar(30)
+  audioUrl String? @map("audio_url") @db.Text // URL clip de audio (max 72h, LOPDP)
+  metadatos Json?  // Distribución de confianza por clase YAMNet
+
+  procesado Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  reportes Reporte[]
+  alertas  Alerta[]
+
+  @@index([tipo])
+  @@index([zonaId])
+  @@index([nodoId])
+  @@index([procesado])
+  @@index([createdAt])
+  @@map("eventos")
+  @@schema("app")
+}
+
+/// Reportes ciudadanos enviados desde la app móvil
+model Reporte {
+  id        String @id @default(uuid()) @db.Uuid
+  usuarioId String? @map("usuario_id") @db.Uuid // Sin FK a identity (LOPDP)
+
+  /// panico | incidente | sospechoso | otro
+  tipo        String  @db.VarChar(30)
+  descripcion String? @db.Text
+  ubicacion   Unsupported("geometry")
+
+  zonaId String? @map("zona_id") @db.Uuid
+  zona   Zona?   @relation(fields: [zonaId], references: [id])
+
+  /// pendiente | en_proceso | resuelto | falso
+  estado    String @default("pendiente") @db.VarChar(20)
+  prioridad Int    @default(1) @db.SmallInt
+
+  fotosUrls   String? @map("fotos_urls") @db.Text // JSON array de URLs
+  eventoId    String? @map("evento_id") @db.Uuid
+  evento      Evento? @relation(fields: [eventoId], references: [id])
+
+  operadorId      String? @map("operador_id") @db.Uuid // UUID del operador que atiende (sin FK)
+  notasOperador   String? @map("notas_operador") @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  cerradoEn DateTime? @map("cerrado_en") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  alertas Alerta[]
+
+  @@index([estado])
+  @@index([zonaId])
+  @@index([usuarioId])
+  @@index([deletedAt])
+  @@map("reportes")
+  @@schema("app")
+}
+
+/// Alertas: centro del flujo de respuesta operativo
+model Alerta {
+  id     String @id @default(uuid()) @db.Uuid
+  codigo String @unique @db.VarChar(30)
+
+  /// audio_ia | reporte_ciudadano | manual
+  tipo        String  @db.VarChar(30)
+  descripcion String? @db.Text
+
+  zonaId String? @map("zona_id") @db.Uuid
+  zona   Zona?   @relation(fields: [zonaId], references: [id])
+
+  severidad Int @default(1) @db.SmallInt
+
+  /// activa | reconocida | cerrada | falsa_alarma
+  estado String @default("activa") @db.VarChar(20)
+
+  eventoId  String? @map("evento_id") @db.Uuid
+  evento    Evento? @relation(fields: [eventoId], references: [id])
+  reporteId String? @map("reporte_id") @db.Uuid
+  reporte   Reporte? @relation(fields: [reporteId], references: [id])
+
+  /// yamnet_auto | operador | sistema
+  generadaPor    String  @map("generada_por") @db.VarChar(30)
+  reconocidaPor  String? @map("reconocida_por") @db.Uuid // UUID operador (sin FK)
+  reconocidaEn   DateTime? @map("reconocida_en") @db.Timestamptz(6)
+  cerradaPor     String? @map("cerrada_por") @db.Uuid   // UUID operador (sin FK)
+  cerradaEn      DateTime? @map("cerrada_en") @db.Timestamptz(6)
+  notas          String? @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  notificaciones Notificacion[]
+
+  @@index([estado])
+  @@index([zonaId])
+  @@index([createdAt])
+  @@map("alertas")
+  @@schema("app")
+}
+
+/// Notificaciones enviadas por canal (FCM, Telegram, WhatsApp)
+model Notificacion {
+  id       String @id @default(uuid()) @db.Uuid
+  alertaId String @map("alerta_id") @db.Uuid
+  alerta   Alerta @relation(fields: [alertaId], references: [id])
+
+  /// fcm | telegram | whatsapp
+  canal          String @db.VarChar(20)
+  destinatarioId String @map("destinatario_id") @db.Uuid // UUID del destinatario (sin FK)
+  titulo         String @db.VarChar(200)
+  cuerpo         String @db.Text
+
+  /// pendiente | enviada | fallida
+  estado          String @default("pendiente") @db.VarChar(20)
+  intentos        Int    @default(0) @db.SmallInt
+  proveedorMsgId  String? @map("proveedor_msg_id") @db.Text
+  errorDetalle    String? @map("error_detalle") @db.Text
+
+  enviadaEn DateTime? @map("enviada_en") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([alertaId])
+  @@index([estado])
+  @@map("notificaciones")
+  @@schema("app")
+}
+
+/// Rutas de patrullaje: manuales o generadas por IA
+model RutaPatrullaje {
+  id     String @id @default(uuid()) @db.Uuid
+  nombre String @db.VarChar(100)
+
+  zonaId String @map("zona_id") @db.Uuid
+  zona   Zona   @relation(fields: [zonaId], references: [id])
+
+  geom Unsupported("geometry")
+  prioridad Int @default(1) @db.SmallInt
+
+  /// diurno | nocturno | 24h
+  turno           String  @db.VarChar(20)
+  activa          Boolean @default(true)
+  generadaPorIa   Boolean @default(false) @map("generada_por_ia")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([zonaId])
+  @@index([activa])
+  @@map("rutas_patrullaje")
+  @@schema("app")
+}
