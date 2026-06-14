@@ -100,6 +100,29 @@ geomWkt: string WKT, opcional
 
 Si `geomWkt` no se envia, se guarda `POLYGON EMPTY`. En ese caso, los eventos pueden tomar la zona desde el nodo como fallback.
 
+### Usuario Zonas
+
+| Pattern | Payload | Descripcion |
+|---|---|---|
+| `usuario_zonas.set_principal` | `ManageUsuarioZonaDto` | Establece la zona principal (única) del usuario |
+| `usuario_zonas.subscribe` | `ManageUsuarioZonaDto` | Suscribe a una zona adicional (máximo 3) |
+| `usuario_zonas.unsubscribe` | `ManageUsuarioZonaDto` | Elimina la asociación de una zona |
+| `usuario_zonas.get_by_user` | `string` (usuarioId) | Devuelve las zonas asignadas al usuario |
+
+Payload para `set_principal`, `subscribe` o `unsubscribe`:
+
+```json
+{
+  "usuarioId": "{{usuarioId}}",
+  "zonaId": "{{zonaId}}"
+}
+```
+
+Reglas:
+- Solo puede existir 1 zona `principal` por usuario. Si se establece otra, se reemplaza la anterior automáticamente.
+- Se permiten máximo 3 zonas `suscrita` por usuario.
+- `get_by_user` devuelve un arreglo con la relación de zonas y sus campos básicos.
+
 ### Nodos
 
 | Pattern | Payload | Descripcion |

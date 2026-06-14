@@ -88,4 +88,71 @@ export class ZonasService {
       data: { activa: false },
     });
   }
+
+  async setZonaPrincipal(usuarioId: string, zonaId: string) {
+    await this.findOne(zonaId); // Verifica existencia
+
+    const principalExistente = await this.prisma.usuarioZona.findFirst({
+      where: { usuarioId, tipo: 'principal' },
+    });
+
+    if (principalExistente) {
+      if (principalExistente.zonaId === zonaId) return principalExistente;
+      
+      await this.prisma.usuarioZona.delete({
+        where: {
+          usuarioId_zonaId: { usuarioId, zonaId: principalExistente.zonaId },
+        },
+      });
+    }
+
+    return this.prisma.usuarioZona.create({
+      data: { usuarioId, zonaId, tipo: 'principal' },
+    });
+  }
+
+  async subscribeZona(usuarioId: string, zonaId: string) {
+    await this.findOne(zonaId); // Verifica existencia
+
+    const suscripciones = await this.prisma.usuarioZona.count({
+      where: { usuarioId, tipo: 'suscrita' },
+    });
+
+    if (suscripciones >= 3) {
+      throw new RpcException({ statusCode: 400, message: 'Límite de 3 zonas suscritas alcanzado' });
+    }
+
+    try {
+      return await this.prisma.usuarioZona.create({
+        data: { usuarioId, zonaId, tipo: 'suscrita' },
+      });
+    } catch (error) {
+      if (error.code === 'P2002') {
+        throw new RpcException({ statusCode: 400, message: 'El usuario ya está asociado a esta zona' });
+      }
+      throw new RpcException({ statusCode: 500, message: 'Error interno al suscribir la zona' });
+    }
+  }
+
+  async unsubscribeZona(usuarioId: string, zonaId: string) {
+    try {
+      return await this.prisma.usuarioZona.delete({
+        where: {
+          usuarioId_zonaId: { usuarioId, zonaId },
+        },
+      });
+    } catch (error) {
+      throw new RpcException({ statusCode: 404, message: 'La asociación con la zona no existe' });
+    }
+  }
+
+  async getUserZonas(usuarioId: string) {
+    return this.prisma.usuarioZona.findMany({
+      where: { usuarioId },
+      include: {
+        zona: { select: { id: true, nombre: true, riesgoNivel: true } },
+      },
+      orderBy: { tipo: 'asc' },
+    });
+  }
 }

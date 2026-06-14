@@ -32,6 +32,7 @@ model Zona {
   reportes         Reporte[]
   alertas          Alerta[]
   rutasPatrullaje  RutaPatrullaje[]
+  usuariosZonas    UsuarioZona[]
 
   @@index([activa])
   @@map("zonas")
@@ -238,5 +239,22 @@ model RutaPatrullaje {
   @@index([zonaId])
   @@index([activa])
   @@map("rutas_patrullaje")
+  @@schema("app")
+}
+
+/// Tabla pivote que resuelve la relación N:M entre identity.usuarios y app.zonas
+model UsuarioZona {
+  usuarioId String @map("usuario_id") @db.Uuid
+  zonaId    String @map("zona_id") @db.Uuid
+  zona      Zona   @relation(fields: [zonaId], references: [id])
+
+  /// principal | suscrita
+  tipo      String @db.VarChar(20)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([usuarioId, zonaId])
+  @@index([zonaId])
+  @@map("usuario_zonas")
   @@schema("app")
 }
