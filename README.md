@@ -327,7 +327,7 @@ El bridge MQTT debe recibir algo equivalente a:
     "plataforma": "ios"
   }
 }
-```
+```6
 
 Y transformarlo a `eventos.create`.
 
