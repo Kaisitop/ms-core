@@ -1,12 +1,18 @@
-import { IsString, IsOptional, IsNumber, IsUUID, IsArray } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsString, IsOptional, IsNumber, IsUUID, IsArray, IsIn } from 'class-validator';
+import { REPORTE_TIPOS } from '../constants/reporte-tipos';
 
 export class CreateReporteDto {
   @IsUUID()
   @IsOptional()
   usuarioId?: string;
 
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
   @IsString()
-  tipo: string; // panico, incidente, sospechoso, otro
+  @IsIn([...REPORTE_TIPOS], {
+    message: `tipo debe ser uno de: ${REPORTE_TIPOS.join(', ')}`,
+  })
+  tipo: string;
 
   @IsString()
   @IsOptional()

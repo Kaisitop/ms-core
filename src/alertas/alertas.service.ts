@@ -35,15 +35,89 @@ export class AlertasService {
   }
 
   async findAll() {
-    return this.prisma.alerta.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      include: {
-        zona: {
-          select: { nombre: true, riesgoNivel: true }
-        }
-      }
-    });
+    const rows = await this.prisma.$queryRaw<any[]>`
+      SELECT
+        a.id,
+        a.codigo,
+        a.tipo,
+        a.descripcion,
+        a.zona_id as "zonaId",
+        a.severidad,
+        a.estado,
+        a.evento_id as "eventoId",
+        a.reporte_id as "reporteId",
+        a.generada_por as "generadaPor",
+        a.reconocida_por as "reconocidaPor",
+        a.reconocida_en as "reconocidaEn",
+        a.cerrada_por as "cerradaPor",
+        a.cerrada_en as "cerradaEn",
+        a.notas,
+        a.created_at as "createdAt",
+        a.updated_at as "updatedAt",
+        a.deleted_at as "deletedAt",
+        (FLOOR(EXTRACT(EPOCH FROM a.created_at) * 1000))::bigint as "timestamp",
+        z.nombre as "zonaNombre",
+        z.riesgo_nivel as "zonaRiesgoNivel",
+        ST_Y(
+          COALESCE(
+            rep.ubicacion::geometry,
+            ev.ubicacion::geometry,
+            nod.ubicacion::geometry,
+            CASE
+              WHEN z.geom IS NOT NULL AND NOT ST_IsEmpty(z.geom)
+                THEN ST_Centroid(z.geom)
+              ELSE NULL
+            END
+          )
+        ) as latitud,
+        ST_X(
+          COALESCE(
+            rep.ubicacion::geometry,
+            ev.ubicacion::geometry,
+            nod.ubicacion::geometry,
+            CASE
+              WHEN z.geom IS NOT NULL AND NOT ST_IsEmpty(z.geom)
+                THEN ST_Centroid(z.geom)
+              ELSE NULL
+            END
+          )
+        ) as longitud
+      FROM app.alertas a
+      LEFT JOIN app.zonas z ON z.id = a.zona_id
+      LEFT JOIN app.reportes rep ON rep.id = a.reporte_id AND rep.deleted_at IS NULL
+      LEFT JOIN app.eventos ev ON ev.id = a.evento_id
+      LEFT JOIN app.nodos nod ON nod.id = ev.nodo_id
+      WHERE a.deleted_at IS NULL
+      ORDER BY a.created_at DESC
+      LIMIT 100
+    `;
+
+    return rows.map((row) => ({
+      id: row.id,
+      codigo: row.codigo,
+      tipo: row.tipo,
+      descripcion: row.descripcion,
+      zonaId: row.zonaId,
+      severidad: row.severidad,
+      estado: row.estado,
+      eventoId: row.eventoId,
+      reporteId: row.reporteId,
+      generadaPor: row.generadaPor,
+      reconocidaPor: row.reconocidaPor,
+      reconocidaEn: row.reconocidaEn,
+      cerradaPor: row.cerradaPor,
+      cerradaEn: row.cerradaEn,
+      notas: row.notas,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      deletedAt: row.deletedAt,
+      zona: row.zonaNombre
+        ? { nombre: row.zonaNombre, riesgoNivel: row.zonaRiesgoNivel }
+        : null,
+      latitud: row.latitud != null ? Number(row.latitud) : null,
+      longitud: row.longitud != null ? Number(row.longitud) : null,
+      timestamp: Number(row.timestamp),
+    }));
   }
 
   async updateStatus(updateDto: UpdateAlertaDto) {
