@@ -113,7 +113,7 @@ model Reporte {
   id        String @id @default(uuid()) @db.Uuid
   usuarioId String? @map("usuario_id") @db.Uuid // Sin FK a identity (LOPDP)
 
-  /// panico | incidente | sospechoso | otro
+  /// PANICO | HOMICIDIO_SICARIATO | SECUESTRO | ROBO | EXTORSION | PERSONA_SOSPECHOSA | VEHICULO_SOSPECHOSO
   tipo        String  @db.VarChar(30)
   descripcion String? @db.Text
   ubicacion   Unsupported("geometry")
@@ -121,8 +121,8 @@ model Reporte {
   zonaId String? @map("zona_id") @db.Uuid
   zona   Zona?   @relation(fields: [zonaId], references: [id])
 
-  /// pendiente | en_proceso | resuelto | falso
-  estado    String @default("pendiente") @db.VarChar(20)
+  /// PENDIENTE | EN_PROCESO | RESUELTO | FALSO
+  estado    String @default("PENDIENTE") @db.VarChar(20)
   prioridad Int    @default(1) @db.SmallInt
 
   fotosUrls   String? @map("fotos_urls") @db.Text // JSON array de URLs
