@@ -1,0 +1,23 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Instalar dependencias necesarias para Prisma y Postgres
+RUN apk add --no-cache openssl netcat-openbsd
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+# Copiar el script de entrada y darle permisos
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Generar el cliente de Prisma (se volverá a correr en el entrypoint por si acaso, pero es buena práctica tenerlo aquí)
+RUN npx prisma generate
+
+EXPOSE 3002
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["npm", "run", "start:dev"]
