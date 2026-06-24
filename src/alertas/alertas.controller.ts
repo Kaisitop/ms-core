@@ -18,6 +18,11 @@ export class AlertasController {
     return this.alertasService.findAll();
   }
 
+  @MessagePattern('alertas.findOne')
+  findOne(@Payload() payload: { id: string }) {
+    return this.alertasService.findOne(payload.id);
+  }
+
   @MessagePattern('alertas.updateStatus')
   updateStatus(@Payload() updateDto: UpdateAlertaDto) {
     return this.alertasService.updateStatus(updateDto);
