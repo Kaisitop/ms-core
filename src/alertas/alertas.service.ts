@@ -1,14 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAlertaDto } from './dto/create-alerta.dto';
 import { UpdateAlertaDto } from './dto/update-alerta.dto';
-import { RpcException } from '@nestjs/microservices';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
 
 @Injectable()
 export class AlertasService {
   private readonly logger = new Logger(AlertasService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject('NATS_SERVICE') private readonly natsClient: ClientProxy,
+  ) {}
 
   async create(createAlertaDto: CreateAlertaDto) {
     try {
@@ -25,6 +28,10 @@ export class AlertasService {
         },
       });
       this.logger.log(`Alerta operativa generada: ${alerta.codigo}`);
+      
+      // Emitir evento a NATS para ms-notificaciones
+      this.natsClient.emit('alerta.created', alerta);
+
       return alerta;
     } catch (error) {
       throw new RpcException({

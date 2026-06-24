@@ -155,4 +155,11 @@ export class ZonasService {
       orderBy: { tipo: 'asc' },
     });
   }
+
+  async getUsersByZona(zonaId: string) {
+    return this.prisma.usuarioZona.findMany({
+      where: { zonaId },
+      select: { usuarioId: true, tipo: true },
+    });
+  }
 }
