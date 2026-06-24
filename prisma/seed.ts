@@ -1,8 +1,10 @@
-import { PrismaClient } from '../generated/prisma';
+import { PrismaClient } from '../generated/prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import * as path from 'path';
 import * as fs from 'fs';
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+const prisma = new PrismaClient({ adapter });
 
 /**
  * Seed: Zonas oficiales del cantón Milagro.
@@ -11,8 +13,8 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Iniciando seed de zonas de Milagro...\n');
 
-  // Leer el JSON desde la raíz del monorepo
-  const jsonPath = path.resolve(__dirname, '../../../zonas_milagro.json');
+  // El JSON está en la misma carpeta que el seed (prisma/zonas_milagro.json)
+  const jsonPath = path.resolve(__dirname, 'zonas_milagro.json');
   if (!fs.existsSync(jsonPath)) {
     throw new Error(`No se encontró el archivo zonas_milagro.json en: ${jsonPath}`);
   }
