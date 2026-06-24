@@ -88,12 +88,52 @@ export class ZonasService {
   }
 
   async update(id: string, updateZonaDto: UpdateZonaDto) {
-    await this.findOne(id); // Verifica existencia
+    await this.findOne(id);
 
-    return this.prisma.zona.update({
-      where: { id },
-      data: updateZonaDto,
-    });
+    const { geomWkt, nombre, descripcion, riesgoNivel, activa } = updateZonaDto;
+
+    try {
+      if (geomWkt !== undefined) {
+        const result = await this.prisma.$queryRaw<any[]>`
+          UPDATE app.zonas
+          SET
+            nombre = COALESCE(${nombre ?? null}, nombre),
+            descripcion = COALESCE(${descripcion ?? null}, descripcion),
+            riesgo_nivel = COALESCE(${riesgoNivel ?? null}, riesgo_nivel),
+            activa = COALESCE(${activa ?? null}, activa),
+            geom = ST_GeomFromText(${geomWkt}, 4326),
+            updated_at = NOW()
+          WHERE id = CAST(${id} AS uuid)
+          RETURNING id, nombre, descripcion, riesgo_nivel as "riesgoNivel", activa, created_at as "createdAt", updated_at as "updatedAt"
+        `;
+
+        return result[0];
+      }
+
+      const data: {
+        nombre?: string;
+        descripcion?: string;
+        riesgoNivel?: number;
+        activa?: boolean;
+      } = {};
+
+      if (nombre !== undefined) data.nombre = nombre;
+      if (descripcion !== undefined) data.descripcion = descripcion;
+      if (riesgoNivel !== undefined) data.riesgoNivel = riesgoNivel;
+      if (activa !== undefined) data.activa = activa;
+
+      if (Object.keys(data).length === 0) {
+        return this.findOne(id);
+      }
+
+      return this.prisma.zona.update({
+        where: { id },
+        data,
+      });
+    } catch (error) {
+      this.logger.error(`Error al actualizar zona: ${error.message}`, error.stack);
+      throw new RpcException({ statusCode: 500, message: 'Error interno al actualizar la zona' });
+    }
   }
 
   async remove(id: string) {

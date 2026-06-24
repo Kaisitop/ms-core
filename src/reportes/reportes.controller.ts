@@ -14,8 +14,13 @@ export class ReportesController {
   }
 
   @MessagePattern('reportes.findAll')
-  findAll() {
-    return this.reportesService.findAll();
+  findAll(@Payload() payload?: { usuarioId?: string }) {
+    return this.reportesService.findAll(payload?.usuarioId);
+  }
+
+  @MessagePattern('reportes.findOne')
+  findOne(@Payload() payload: { id: string; usuarioId?: string }) {
+    return this.reportesService.findOne(payload.id, payload.usuarioId);
   }
 
   @MessagePattern('reportes.updateStatus')
