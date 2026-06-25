@@ -27,4 +27,9 @@ export class ReportesController {
   updateStatus(@Payload() updateDto: UpdateReporteStatusDto) {
     return this.reportesService.updateStatus(updateDto);
   }
+
+  @MessagePattern('reportes.purgeByUsuario')
+  purgeByUsuario(@Payload() payload: { usuarioId: string }) {
+    return this.reportesService.purgeByUsuarioId(payload.usuarioId);
+  }
 }
