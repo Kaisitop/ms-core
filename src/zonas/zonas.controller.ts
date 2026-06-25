@@ -52,8 +52,8 @@ export class ZonasController {
     return this.zonasService.getUserZonas(usuarioId);
   }
 
-  @MessagePattern('usuario_zonas.get_users_by_zona')
-  getUsersByZona(@Payload() zonaId: string) {
-    return this.zonasService.getUsersByZona(zonaId);
+  @MessagePattern('usuario_zonas.purge_by_user')
+  purgeUserZonas(@Payload() usuarioId: string) {
+    return this.zonasService.purgeUserZonas(usuarioId);
   }
 }

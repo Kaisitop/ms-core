@@ -315,6 +315,61 @@ export class ReportesService {
     };
   }
 
+  async purgeByUsuarioId(usuarioId: string) {
+    try {
+      const reportes = await this.prisma.reporte.findMany({
+        where: { usuarioId, deletedAt: null },
+        select: { id: true },
+      });
+
+      const reporteIds = reportes.map((reporte) => reporte.id);
+
+      if (reporteIds.length > 0) {
+        await this.prisma.alerta.updateMany({
+          where: {
+            reporteId: { in: reporteIds },
+            estado: 'activa',
+          },
+          data: {
+            estado: 'cerrada',
+            notas: 'Cerrada: datos del ciudadano eliminados (LOPDP)',
+            cerradaEn: new Date(),
+          },
+        });
+      }
+
+      const purged = await this.prisma.$executeRaw`
+        UPDATE app.reportes
+        SET
+          deleted_at = NOW(),
+          usuario_id = NULL,
+          descripcion = '[dato eliminado]',
+          fotos_urls = '[]',
+          updated_at = NOW()
+        WHERE usuario_id = CAST(${usuarioId} AS uuid)
+          AND deleted_at IS NULL
+      `;
+
+      this.logger.log(
+        `Datos ciudadano purgados: usuario=${usuarioId}, reportes=${Number(purged)}`,
+      );
+
+      return {
+        reportesPurged: Number(purged),
+        alertasCerradas: reporteIds.length,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error al purgar datos del ciudadano ${usuarioId}: ${error.message}`,
+        error.stack,
+      );
+      throw new RpcException({
+        status: 500,
+        message: 'Error interno al eliminar los datos del ciudadano',
+      });
+    }
+  }
+
   async updateStatus(updateDto: UpdateReporteStatusDto) {
     try {
       const estado = normalizeReporteEstado(updateDto.estado);
