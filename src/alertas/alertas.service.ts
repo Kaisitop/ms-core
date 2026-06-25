@@ -1,14 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAlertaDto } from './dto/create-alerta.dto';
 import { UpdateAlertaDto } from './dto/update-alerta.dto';
-import { RpcException } from '@nestjs/microservices';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
 
 @Injectable()
 export class AlertasService {
   private readonly logger = new Logger(AlertasService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject('NATS_SERVICE') private readonly natsClient: ClientProxy,
+  ) {}
 
   async create(createAlertaDto: CreateAlertaDto) {
     try {
@@ -25,6 +28,10 @@ export class AlertasService {
         },
       });
       this.logger.log(`Alerta operativa generada: ${alerta.codigo}`);
+      
+      // Emitir evento a NATS para ms-notificaciones
+      this.natsClient.emit('alerta.created', alerta);
+
       return alerta;
     } catch (error) {
       throw new RpcException({
@@ -43,9 +50,24 @@ export class AlertasService {
         a.descripcion,
         a.severidad,
         a.estado,
+        a.evento_id as "eventoId",
+        a.reporte_id as "reporteId",
+        a.generada_por as "generadaPor",
+        a.comentario_cierre as "comentarioCierre",
+        a.evidencia_urls as "evidenciaUrls",
         a.created_at as "createdAt",
         (FLOOR(EXTRACT(EPOCH FROM a.created_at) * 1000))::bigint as "timestamp",
         z.nombre as "zonaNombre",
+        ev.tipo as "evTipo",
+        ev.subtipo as "evSubtipo",
+        ev.confianza as "evConfianza",
+        ev.fuente as "evFuente",
+        ev.severidad as "evSeveridad",
+        ev.metadatos as "evMetadatos",
+        ev.nodo_id as "evNodoId",
+        rep.tipo as "repTipo",
+        rep.descripcion as "repDescripcion",
+        nod.codigo as "nodoCodigo",
         ST_Y(
           COALESCE(
             rep.ubicacion::geometry,
@@ -101,11 +123,29 @@ export class AlertasService {
         a.cerrada_por as "cerradaPor",
         a.cerrada_en as "cerradaEn",
         a.notas,
+        a.comentario_cierre as "comentarioCierre",
+        a.evidencia_urls as "evidenciaUrls",
         a.created_at as "createdAt",
         a.updated_at as "updatedAt",
         (FLOOR(EXTRACT(EPOCH FROM a.created_at) * 1000))::bigint as "timestamp",
         z.nombre as "zonaNombre",
         z.riesgo_nivel as "zonaRiesgoNivel",
+        ev.tipo as "evTipo",
+        ev.subtipo as "evSubtipo",
+        ev.confianza as "evConfianza",
+        ev.fuente as "evFuente",
+        ev.severidad as "evSeveridad",
+        ev.metadatos as "evMetadatos",
+        ev.nodo_id as "evNodoId",
+        ev.audio_url as "evAudioUrl",
+        ev.procesado as "evProcesado",
+        ev.created_at as "evCreatedAt",
+        rep.tipo as "repTipo",
+        rep.descripcion as "repDescripcion",
+        rep.estado as "repEstado",
+        rep.prioridad as "repPrioridad",
+        rep.created_at as "repCreatedAt",
+        nod.codigo as "nodoCodigo",
         ST_Y(
           COALESCE(
             rep.ubicacion::geometry,
@@ -150,7 +190,40 @@ export class AlertasService {
     return this.mapAlertaDetailRow(rows[0]);
   }
 
+  private buildEventoFromRow(row: any) {
+    if (!row.eventoId) return null;
+    return {
+      id: row.eventoId,
+      tipo: row.evTipo,
+      subtipo: row.evSubtipo,
+      confianza: row.evConfianza != null ? Number(row.evConfianza) : null,
+      severidad: row.evSeveridad != null ? Number(row.evSeveridad) : null,
+      fuente: row.evFuente,
+      nodoId: row.evNodoId,
+      metadatos: row.evMetadatos ?? null,
+      nodoCodigo: row.nodoCodigo ?? null,
+      audioUrl: row.evAudioUrl ?? null,
+      procesado: row.evProcesado ?? false,
+      createdAt: row.evCreatedAt ?? null,
+    };
+  }
+
+  private buildReporteFromRow(row: any) {
+    if (!row.reporteId) return null;
+    return {
+      id: row.reporteId,
+      tipo: row.repTipo,
+      descripcion: row.repDescripcion,
+      estado: row.repEstado ?? null,
+      prioridad: row.repPrioridad != null ? Number(row.repPrioridad) : null,
+      createdAt: row.repCreatedAt ?? null,
+    };
+  }
+
   private mapAlertaListRow(row: any) {
+    const evento = this.buildEventoFromRow(row);
+    const reporte = this.buildReporteFromRow(row);
+
     return {
       id: row.id,
       codigo: row.codigo,
@@ -159,6 +232,13 @@ export class AlertasService {
       zonaNombre: row.zonaNombre ?? null,
       severidad: Number(row.severidad),
       estado: row.estado,
+      eventoId: row.eventoId ?? null,
+      reporteId: row.reporteId ?? null,
+      generadaPor: row.generadaPor,
+      comentarioCierre: row.comentarioCierre ?? null,
+      evidenciaUrls: row.evidenciaUrls ?? null,
+      evento,
+      reporte,
       createdAt: row.createdAt,
       timestamp: Number(row.timestamp),
       latitud: row.latitud != null ? Number(row.latitud) : null,
@@ -167,6 +247,9 @@ export class AlertasService {
   }
 
   private mapAlertaDetailRow(row: any) {
+    const evento = this.buildEventoFromRow(row);
+    const reporte = this.buildReporteFromRow(row);
+
     return {
       id: row.id,
       codigo: row.codigo,
@@ -184,6 +267,10 @@ export class AlertasService {
       cerradaPor: row.cerradaPor,
       cerradaEn: row.cerradaEn,
       notas: row.notas,
+      comentarioCierre: row.comentarioCierre ?? null,
+      evidenciaUrls: row.evidenciaUrls ?? null,
+      evento,
+      reporte,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       timestamp: Number(row.timestamp),
@@ -198,12 +285,22 @@ export class AlertasService {
   async updateStatus(updateDto: UpdateAlertaDto) {
     try {
       const isReconocimiento = updateDto.estado === 'reconocida';
-      const isCierre = ['cerrada', 'falsa_alarma'].includes(updateDto.estado);
+      const isCierre = ['cerrada', 'falsa_alarma', 'completada'].includes(
+        updateDto.estado,
+      );
 
       const data: any = {
         estado: updateDto.estado,
         notas: updateDto.notas,
       };
+
+      if (updateDto.comentarioCierre !== undefined) {
+        data.comentarioCierre = updateDto.comentarioCierre;
+      }
+
+      if (updateDto.evidenciaUrls !== undefined) {
+        data.evidenciaUrls = updateDto.evidenciaUrls;
+      }
 
       if (isReconocimiento) {
         data.reconocidaPor = updateDto.operadorId;
@@ -215,10 +312,14 @@ export class AlertasService {
         data.cerradaEn = new Date();
       }
 
-      return await this.prisma.alerta.update({
+      const alerta = await this.prisma.alerta.update({
         where: { id: updateDto.id },
         data,
       });
+
+      this.natsClient.emit('alerta.updated', alerta);
+
+      return alerta;
     } catch (error) {
       throw new RpcException({
         status: 400,
