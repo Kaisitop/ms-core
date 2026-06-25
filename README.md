@@ -29,7 +29,7 @@ Puede ser un telefono de patrullero, operador o prototipo de app movil. La ubica
 
 ```env
 PORT=3001
-NATS_SERVERS="nats://localhost:4222"
+NATS_SERVICE="nats://localhost:4222"
 DATABASE_URL="postgresql://postgres:TU_PASSWORD@localhost:5432/coreDB?schema=public"
 ```
 
