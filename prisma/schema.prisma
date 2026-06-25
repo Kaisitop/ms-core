@@ -161,8 +161,12 @@ model Alerta {
 
   severidad Int @default(1) @db.SmallInt
 
-  /// activa | reconocida | cerrada | falsa_alarma
+  /// activa | reconocida | cerrada | falsa_alarma | completada
   estado String @default("activa") @db.VarChar(20)
+
+  /// JSON array de URLs o data-URLs de evidencia fotográfica al cierre
+  evidenciaUrls    String? @map("evidencia_urls") @db.Text
+  comentarioCierre String? @map("comentario_cierre") @db.Text
 
   eventoId  String? @map("evento_id") @db.Uuid
   evento    Evento? @relation(fields: [eventoId], references: [id])

@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventoDto } from './dto/create-evento.dto';
 import { UpdateEventoDto } from './dto/update-evento.dto';
-import { RpcException } from '@nestjs/microservices';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { ConfirmacionAlertasService } from './confirmacion-alertas.service';
 
 @Injectable()
@@ -12,6 +12,7 @@ export class EventosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly confirmacionAlertas: ConfirmacionAlertasService,
+    @Inject('NATS_SERVICE') private readonly natsClient: ClientProxy,
   ) {}
 
   async create(createEventoDto: CreateEventoDto) {
@@ -80,6 +81,8 @@ export class EventosService {
         severidad,
         createdAt: new Date(eventoCreado.createdAt),
       });
+
+      this.natsClient.emit('evento.created', eventoCreado);
 
       return eventoCreado;
     } catch (error) {
@@ -150,6 +153,14 @@ export class EventosService {
         confianza: confianzaFinal,
         severidad: severidadFinal,
         createdAt: eventoActualizado.createdAt,
+      });
+
+      this.natsClient.emit('evento.updated', {
+        id: eventoActualizado.id,
+        subtipo: eventoActualizado.subtipo,
+        confianza: eventoActualizado.confianza,
+        severidad: eventoActualizado.severidad,
+        procesado: eventoActualizado.procesado,
       });
 
       return eventoActualizado;
