@@ -242,6 +242,24 @@ export class ZonasService {
     }
   }
 
+  async purgeUserZonas(usuarioId: string) {
+    try {
+      const deleted = await this.prisma.usuarioZona.deleteMany({
+        where: { usuarioId },
+      });
+      return { zonasPurged: deleted.count };
+    } catch (error) {
+      this.logger.error(
+        `Error al purgar zonas del usuario ${usuarioId}: ${error.message}`,
+        error.stack,
+      );
+      throw new RpcException({
+        statusCode: 500,
+        message: 'Error interno al eliminar las zonas del usuario',
+      });
+    }
+  }
+
   async getUserZonas(usuarioId: string) {
     const rows = await this.prisma.$queryRaw<any[]>`
       SELECT
