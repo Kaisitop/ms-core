@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -6,7 +6,7 @@ import { CreateReporteDto } from './dto/create-reporte.dto';
 
 import { UpdateReporteStatusDto } from './dto/update-reporte-status.dto';
 
-import { RpcException } from '@nestjs/microservices';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
 
 import { AlertasService } from '../alertas/alertas.service';
 import {
@@ -33,6 +33,8 @@ export class ReportesService {
     private readonly prisma: PrismaService,
 
     private readonly alertasService: AlertasService,
+
+    @Inject('NATS_SERVICE') private readonly natsClient: ClientProxy,
 
   ) {}
 
@@ -143,7 +145,11 @@ export class ReportesService {
 
 
 
-      return this.findOne(reporteId);
+      const reporte = await this.findOne(reporteId);
+
+      this.natsClient.emit('reporte.created', reporte);
+
+      return reporte;
 
     } catch (error) {
 
@@ -323,10 +329,21 @@ export class ReportesService {
         data.cerradoEn = new Date();
       }
 
-      return await this.prisma.reporte.update({
+      const updated = await this.prisma.reporte.update({
         where: { id: updateDto.id },
         data,
       });
+
+      this.natsClient.emit('reporte.updated', {
+        id: updated.id,
+        estado: updated.estado,
+        prioridad: updated.prioridad,
+        operadorId: updated.operadorId,
+        notasOperador: updated.notasOperador,
+        updatedAt: updated.updatedAt,
+      });
+
+      return updated;
     } catch (error) {
       throw new RpcException({
         status: 400,

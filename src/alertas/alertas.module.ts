@@ -3,6 +3,7 @@ import { AlertasService } from './alertas.service';
 import { AlertasController } from './alertas.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { envs } from '../config/envs';
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
         name: 'NATS_SERVICE',
         transport: Transport.NATS,
         options: {
-          servers: ['nats://localhost:4222'],
+          servers: envs.natsServers,
         },
       },
     ]),
