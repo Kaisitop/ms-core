@@ -8,6 +8,7 @@ import { ReportesModule } from './reportes/reportes.module';
 import { AlertasModule } from './alertas/alertas.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { PatrullajeModule } from './patrullaje/patrullaje.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     AlertasModule,
     NotificacionesModule,
     AnalyticsModule,
+    PatrullajeModule,
   ],
 })
 export class AppModule {}

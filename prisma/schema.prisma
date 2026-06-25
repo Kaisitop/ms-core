@@ -262,3 +262,17 @@ model UsuarioZona {
   @@map("usuario_zonas")
   @@schema("app")
 }
+
+/// Última posición GPS reportada por un patrullero (usuario Policia)
+model PosicionPatrullero {
+  usuarioId  String   @id @map("usuario_id") @db.Uuid
+  nombre     String?  @db.VarChar(120)
+  latitud    Float
+  longitud   Float
+  precisionM Float?   @map("precision_m")
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([updatedAt])
+  @@map("posiciones_patrullero")
+  @@schema("app")
+}
