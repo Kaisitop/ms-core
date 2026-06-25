@@ -42,13 +42,30 @@ export class ZonasService {
   }
 
   async findAll() {
-    return this.prisma.zona.findMany({
-      where: { activa: true },
-      include: {
-        _count: { select: { nodos: true, eventos: true } },
-      },
-      orderBy: { nombre: 'asc' },
-    });
+    // Usamos $queryRaw para extraer la geometría con ST_AsText
+    const zonasRaw = await this.prisma.$queryRaw<any[]>`
+      SELECT 
+        z.id, 
+        z.nombre, 
+        z.descripcion, 
+        ST_AsText(z.geom) as "geomWkt", 
+        z.riesgo_nivel as "riesgoNivel", 
+        z.activa,
+        (SELECT COUNT(*) FROM app.nodos n WHERE n.zona_id = z.id AND n.activo = true)::int as "nodosCount",
+        (SELECT COUNT(*) FROM app.eventos e WHERE e.zona_id = z.id)::int as "eventosCount"
+      FROM app.zonas z
+      WHERE z.activa = true
+      ORDER BY z.nombre ASC
+    `;
+    
+    // Mapeamos para mantener la estructura que espera el Gateway/Frontend
+    return zonasRaw.map(z => ({
+      ...z,
+      _count: {
+        nodos: z.nodosCount,
+        eventos: z.eventosCount
+      }
+    }));
   }
 
   async findOne(id: string) {
@@ -289,5 +306,12 @@ export class ZonasService {
         geomWkt: row.zona_geomWkt,
       },
     }));
+  }
+
+  async getUsersByZona(zonaId: string) {
+    return this.prisma.usuarioZona.findMany({
+      where: { zonaId },
+      select: { usuarioId: true, tipo: true },
+    });
   }
 }

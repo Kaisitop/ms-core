@@ -13,4 +13,13 @@ export class UpdateAlertaDto {
   @IsString()
   @IsOptional()
   notas?: string;
+
+  @IsString()
+  @IsOptional()
+  comentarioCierre?: string;
+
+  /** JSON array serializado de URLs de evidencia */
+  @IsString()
+  @IsOptional()
+  evidenciaUrls?: string;
 }
