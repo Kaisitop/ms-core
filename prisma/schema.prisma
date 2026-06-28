@@ -211,12 +211,15 @@ model Notificacion {
   intentos        Int    @default(0) @db.SmallInt
   proveedorMsgId  String? @map("proveedor_msg_id") @db.Text
   errorDetalle    String? @map("error_detalle") @db.Text
+  leida           Boolean @default(false)
 
   enviadaEn DateTime? @map("enviada_en") @db.Timestamptz(6)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([alertaId])
+  @@index([destinatarioId])
   @@index([estado])
+  @@index([createdAt])
   @@map("notificaciones")
   @@schema("app")
 }

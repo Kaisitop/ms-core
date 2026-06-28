@@ -134,8 +134,10 @@ export class ReportesService {
       if (tipoConfig.generaAlerta) {
         await this.alertasService.create({
           codigo: `ALT-REP-${Date.now()}`,
-          tipo: 'reporte_ciudadano',
-          descripcion: `Reporte de ciudadano: ${tipoNormalizado} - ${descripcion || 'Sin descripción'}`,
+          tipo: tipoNormalizado,
+          descripcion:
+            descripcion?.trim() ||
+            `Alerta ${tipoConfig.etiqueta} reportada por un ciudadano.`,
           zonaId,
           severidad: tipoConfig.severidadAlerta,
           reporteId,
