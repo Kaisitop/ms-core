@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { RpcException } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildNotificationPayload } from './notification-payload.util';
 
 @Injectable()
 export class NotificacionesService {
@@ -18,5 +20,100 @@ export class NotificacionesService {
       this.logger.error(`Error guardando notificaciones: ${error.message}`);
       throw error;
     }
+  }
+
+  async findByDestinatario(payload: {
+    destinatarioId: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const limit = Math.min(Math.max(payload.limit ?? 50, 1), 100);
+    const offset = Math.max(payload.offset ?? 0, 0);
+
+    const rows = await this.prisma.notificacion.findMany({
+      where: {
+        destinatarioId: payload.destinatarioId,
+        canal: 'fcm',
+        estado: 'enviada',
+      },
+      include: {
+        alerta: {
+          include: {
+            zona: { select: { nombre: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+    });
+
+    return rows.map((row) =>
+      buildNotificationPayload({
+        id: row.id,
+        alertaId: row.alertaId,
+        createdAt: row.createdAt,
+        leida: row.leida,
+        alerta: {
+          tipo: row.alerta.tipo,
+          descripcion: row.alerta.descripcion,
+          zona: row.alerta.zona,
+        },
+      }),
+    );
+  }
+
+  async markAsRead(payload: {
+    destinatarioId: string;
+    notificacionId: string;
+  }) {
+    const row = await this.prisma.notificacion.findFirst({
+      where: {
+        id: payload.notificacionId,
+        destinatarioId: payload.destinatarioId,
+        canal: 'fcm',
+        estado: 'enviada',
+      },
+      include: {
+        alerta: {
+          include: {
+            zona: { select: { nombre: true } },
+          },
+        },
+      },
+    });
+
+    if (!row) {
+      throw new RpcException({
+        statusCode: 404,
+        message: 'Notificación no encontrada',
+      });
+    }
+
+    const updated = row.leida
+      ? row
+      : await this.prisma.notificacion.update({
+          where: { id: row.id },
+          data: { leida: true },
+          include: {
+            alerta: {
+              include: {
+                zona: { select: { nombre: true } },
+              },
+            },
+          },
+        });
+
+    return buildNotificationPayload({
+      id: updated.id,
+      alertaId: updated.alertaId,
+      createdAt: updated.createdAt,
+      leida: updated.leida,
+      alerta: {
+        tipo: updated.alerta.tipo,
+        descripcion: updated.alerta.descripcion,
+        zona: updated.alerta.zona,
+      },
+    });
   }
 }

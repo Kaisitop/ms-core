@@ -10,4 +10,18 @@ export class NotificacionesController {
   createMany(@Payload() data: any[]) {
     return this.notificacionesService.createMany(data);
   }
+
+  @MessagePattern('notificaciones.find_by_destinatario')
+  findByDestinatario(
+    @Payload() payload: { destinatarioId: string; limit?: number; offset?: number },
+  ) {
+    return this.notificacionesService.findByDestinatario(payload);
+  }
+
+  @MessagePattern('notificaciones.mark_as_read')
+  markAsRead(
+    @Payload() payload: { destinatarioId: string; notificacionId: string },
+  ) {
+    return this.notificacionesService.markAsRead(payload);
+  }
 }

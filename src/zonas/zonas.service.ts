@@ -310,7 +310,10 @@ export class ZonasService {
 
   async getUsersByZona(zonaId: string) {
     return this.prisma.usuarioZona.findMany({
-      where: { zonaId },
+      where: {
+        zonaId,
+        tipo: { in: ['principal', 'suscrita'] },
+      },
       select: { usuarioId: true, tipo: true },
     });
   }
