@@ -219,8 +219,11 @@ metadatos: object, opcional
 | Pattern | Payload | Descripcion |
 |---|---|---|
 | `reportes.create` | `CreateReporteDto` | Crea reporte ciudadano |
-| `reportes.findAll` | `{}` | Lista reportes |
+| `reportes.findAll` | `{}` o `{ usuarioId }` | Lista reportes (incluye `fotosUrls`, `eventoId`) |
+| `reportes.findOne` | `{ id, usuarioId? }` | Detalle con fotos, operador y cierre |
 | `reportes.updateStatus` | `UpdateReporteStatusDto` | Cambia estado |
+
+**Campo `fotosUrls`:** se persiste en `app.reportes.fotos_urls` como texto JSON (`["https://...", ...]`). Las URLs provienen de Cloudinary vía `c-gateway` (`POST /api/media/upload?tipo=reporte`). Admin y operador las consultan en `findOne` / listado enriquecido.
 
 Crear reporte:
 
@@ -259,8 +262,22 @@ pendiente | en_proceso | resuelto | falso
 | Pattern | Payload | Descripcion |
 |---|---|---|
 | `alertas.create` | `CreateAlertaDto` | Crea alerta operativa |
-| `alertas.findAll` | `{}` | Lista alertas |
+| `alertas.findAll` | `{}` | Lista alertas (incluye `evidenciaUrls` y `reporte.fotosUrls`) |
+| `alertas.findOne` | `{ id }` | Detalle completo con evidencia y fotos del reporte vinculado |
 | `alertas.updateStatus` | `UpdateAlertaDto` | Reconoce o cierra alerta |
+
+**Campo `evidenciaUrls`:** se persiste en `app.alertas.evidencia_urls` como JSON array de URLs Cloudinary (evidencia policial al cerrar). En `findOne`, el reporte anidado expone `fotosUrls` del ciudadano cuando `reporte_id` está presente.
+
+Cerrar alerta con evidencia (vía gateway `PATCH /alertas/:id/cerrar`):
+
+```json
+{
+  "id": "{{alertaId}}",
+  "estado": "completada",
+  "comentarioCierre": "Caso atendido",
+  "evidenciaUrls": "[\"https://res.cloudinary.com/.../foto.jpg\"]"
+}
+```
 
 Crear alerta manual:
 
@@ -327,9 +344,13 @@ El bridge MQTT debe recibir algo equivalente a:
     "plataforma": "ios"
   }
 }
-```6
+```
 
 Y transformarlo a `eventos.create`.
+
+## Visualización de fotos (frontend)
+
+`ms-core` no sirve archivos estáticos. Las imágenes se alojan en **Cloudinary**; el dashboard web (`webcentinela`) renderiza las URLs devueltas en `fotosUrls` y `evidenciaUrls`. Ver README del monorepo raíz y de `c-gateway` para el flujo de subida.
 
 ## Checklist de prueba
 

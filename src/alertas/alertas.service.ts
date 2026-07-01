@@ -67,6 +67,10 @@ export class AlertasService {
         ev.nodo_id as "evNodoId",
         rep.tipo as "repTipo",
         rep.descripcion as "repDescripcion",
+        rep.estado as "repEstado",
+        rep.prioridad as "repPrioridad",
+        rep.fotos_urls as "repFotosUrls",
+        rep.created_at as "repCreatedAt",
         nod.codigo as "nodoCodigo",
         ST_Y(
           COALESCE(
@@ -144,6 +148,7 @@ export class AlertasService {
         rep.descripcion as "repDescripcion",
         rep.estado as "repEstado",
         rep.prioridad as "repPrioridad",
+        rep.fotos_urls as "repFotosUrls",
         rep.created_at as "repCreatedAt",
         nod.codigo as "nodoCodigo",
         ST_Y(
@@ -216,6 +221,7 @@ export class AlertasService {
       descripcion: row.repDescripcion,
       estado: row.repEstado ?? null,
       prioridad: row.repPrioridad != null ? Number(row.repPrioridad) : null,
+      fotosUrls: row.repFotosUrls ?? null,
       createdAt: row.repCreatedAt ?? null,
     };
   }

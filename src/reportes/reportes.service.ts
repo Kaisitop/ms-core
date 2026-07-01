@@ -181,6 +181,8 @@ export class ReportesService {
             z.nombre as "zonaNombre",
             r.estado,
             r.prioridad,
+            r.fotos_urls as "fotosUrls",
+            r.evento_id as "eventoId",
             r.created_at as "createdAt",
             (FLOOR(EXTRACT(EPOCH FROM r.created_at) * 1000))::bigint as "timestamp"
           FROM app.reportes r
@@ -198,6 +200,8 @@ export class ReportesService {
             z.nombre as "zonaNombre",
             r.estado,
             r.prioridad,
+            r.fotos_urls as "fotosUrls",
+            r.evento_id as "eventoId",
             r.created_at as "createdAt",
             (FLOOR(EXTRACT(EPOCH FROM r.created_at) * 1000))::bigint as "timestamp"
           FROM app.reportes r
@@ -235,6 +239,14 @@ export class ReportesService {
         r.prioridad,
 
         r.fotos_urls as "fotosUrls",
+
+        r.evento_id as "eventoId",
+
+        r.operador_id as "operadorId",
+
+        r.notas_operador as "notasOperador",
+
+        r.cerrado_en as "cerradoEn",
 
         r.created_at as "createdAt",
 
@@ -294,6 +306,8 @@ export class ReportesService {
       zonaNombre: row.zonaNombre ?? null,
       estado: row.estado,
       prioridad: Number(row.prioridad),
+      fotosUrls: row.fotosUrls ?? null,
+      eventoId: row.eventoId ?? null,
       createdAt: row.createdAt,
       timestamp: Number(row.timestamp),
     };
@@ -309,6 +323,10 @@ export class ReportesService {
       estado: row.estado,
       prioridad: Number(row.prioridad),
       fotosUrls: row.fotosUrls,
+      eventoId: row.eventoId ?? null,
+      operadorId: row.operadorId ?? null,
+      notasOperador: row.notasOperador ?? null,
+      cerradoEn: row.cerradoEn ?? null,
       createdAt: row.createdAt,
       timestamp: Number(row.timestamp),
       updatedAt: row.updatedAt,
