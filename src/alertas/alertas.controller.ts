@@ -18,6 +18,11 @@ export class AlertasController {
     return this.alertasService.findAll();
   }
 
+  @MessagePattern('alertas.findForMap')
+  findForMap(@Payload() payload: { horas?: number }) {
+    return this.alertasService.findForMap(payload?.horas);
+  }
+
   @MessagePattern('alertas.findOne')
   findOne(@Payload() payload: { id: string }) {
     return this.alertasService.findOne(payload.id);

@@ -42,12 +42,34 @@ export class AlertasService {
   }
 
   async findAll() {
-    const rows = await this.prisma.$queryRaw<any[]>`
+    return this.queryAlertasList();
+  }
+
+  /**
+   * Mapa ciudadano: alertas activas o creadas en las últimas `horas`.
+   */
+  async findForMap(horas = 24) {
+    const windowHours = this.normalizeMapWindowHours(horas);
+    return this.queryAlertasList({ mapWindowHours: windowHours });
+  }
+
+  private normalizeMapWindowHours(horas?: number): number {
+    const value = Number(horas);
+    if (!Number.isFinite(value)) return 24;
+    return Math.min(Math.max(Math.trunc(value), 1), 168);
+  }
+
+  private async queryAlertasList(options?: { mapWindowHours?: number }) {
+    const mapWindowHours = options?.mapWindowHours;
+    const rows =
+      mapWindowHours == null
+        ? await this.prisma.$queryRaw<any[]>`
       SELECT
         a.id,
         a.codigo,
         a.tipo,
         a.descripcion,
+        a.zona_id as "zonaId",
         a.severidad,
         a.estado,
         a.evento_id as "eventoId",
@@ -102,6 +124,74 @@ export class AlertasService {
       LEFT JOIN app.eventos ev ON ev.id = a.evento_id
       LEFT JOIN app.nodos nod ON nod.id = ev.nodo_id
       WHERE a.deleted_at IS NULL
+      ORDER BY a.created_at DESC
+      LIMIT 100
+    `
+        : await this.prisma.$queryRaw<any[]>`
+      SELECT
+        a.id,
+        a.codigo,
+        a.tipo,
+        a.descripcion,
+        a.zona_id as "zonaId",
+        a.severidad,
+        a.estado,
+        a.evento_id as "eventoId",
+        a.reporte_id as "reporteId",
+        a.generada_por as "generadaPor",
+        a.comentario_cierre as "comentarioCierre",
+        a.evidencia_urls as "evidenciaUrls",
+        a.created_at as "createdAt",
+        (FLOOR(EXTRACT(EPOCH FROM a.created_at) * 1000))::bigint as "timestamp",
+        z.nombre as "zonaNombre",
+        ev.tipo as "evTipo",
+        ev.subtipo as "evSubtipo",
+        ev.confianza as "evConfianza",
+        ev.fuente as "evFuente",
+        ev.severidad as "evSeveridad",
+        ev.metadatos as "evMetadatos",
+        ev.nodo_id as "evNodoId",
+        rep.tipo as "repTipo",
+        rep.descripcion as "repDescripcion",
+        rep.estado as "repEstado",
+        rep.prioridad as "repPrioridad",
+        rep.fotos_urls as "repFotosUrls",
+        rep.created_at as "repCreatedAt",
+        nod.codigo as "nodoCodigo",
+        ST_Y(
+          COALESCE(
+            rep.ubicacion::geometry,
+            ev.ubicacion::geometry,
+            nod.ubicacion::geometry,
+            CASE
+              WHEN z.geom IS NOT NULL AND NOT ST_IsEmpty(z.geom)
+                THEN ST_Centroid(z.geom)
+              ELSE NULL
+            END
+          )
+        ) as latitud,
+        ST_X(
+          COALESCE(
+            rep.ubicacion::geometry,
+            ev.ubicacion::geometry,
+            nod.ubicacion::geometry,
+            CASE
+              WHEN z.geom IS NOT NULL AND NOT ST_IsEmpty(z.geom)
+                THEN ST_Centroid(z.geom)
+              ELSE NULL
+            END
+          )
+        ) as longitud
+      FROM app.alertas a
+      LEFT JOIN app.zonas z ON z.id = a.zona_id
+      LEFT JOIN app.reportes rep ON rep.id = a.reporte_id AND rep.deleted_at IS NULL
+      LEFT JOIN app.eventos ev ON ev.id = a.evento_id
+      LEFT JOIN app.nodos nod ON nod.id = ev.nodo_id
+      WHERE a.deleted_at IS NULL
+        AND (
+          a.estado = 'activa'
+          OR a.created_at >= NOW() - (${mapWindowHours} * INTERVAL '1 hour')
+        )
       ORDER BY a.created_at DESC
       LIMIT 100
     `;
@@ -235,6 +325,7 @@ export class AlertasService {
       codigo: row.codigo,
       tipo: row.tipo,
       descripcion: row.descripcion,
+      zonaId: row.zonaId ?? null,
       zonaNombre: row.zonaNombre ?? null,
       severidad: Number(row.severidad),
       estado: row.estado,
