@@ -6,8 +6,15 @@ import { buildNotificationPayload } from './notification-payload.util';
 @Injectable()
 export class NotificacionesService {
   private readonly logger = new Logger(NotificacionesService.name);
+  private readonly defaultWindowHours = 24;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private normalizeWindowHours(horas?: number): number {
+    const value = Number(horas);
+    if (!Number.isFinite(value)) return this.defaultWindowHours;
+    return Math.min(Math.max(Math.trunc(value), 1), 168);
+  }
 
   async createMany(data: any[]) {
     try {
@@ -26,15 +33,19 @@ export class NotificacionesService {
     destinatarioId: string;
     limit?: number;
     offset?: number;
+    horas?: number;
   }) {
     const limit = Math.min(Math.max(payload.limit ?? 50, 1), 100);
     const offset = Math.max(payload.offset ?? 0, 0);
+    const windowHours = this.normalizeWindowHours(payload.horas);
+    const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000);
 
     const rows = await this.prisma.notificacion.findMany({
       where: {
         destinatarioId: payload.destinatarioId,
         canal: 'fcm',
         estado: 'enviada',
+        createdAt: { gte: cutoff },
       },
       include: {
         alerta: {

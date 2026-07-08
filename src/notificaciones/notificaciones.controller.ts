@@ -13,7 +13,13 @@ export class NotificacionesController {
 
   @MessagePattern('notificaciones.find_by_destinatario')
   findByDestinatario(
-    @Payload() payload: { destinatarioId: string; limit?: number; offset?: number },
+    @Payload()
+    payload: {
+      destinatarioId: string;
+      limit?: number;
+      offset?: number;
+      horas?: number;
+    },
   ) {
     return this.notificacionesService.findByDestinatario(payload);
   }
