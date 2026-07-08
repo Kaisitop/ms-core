@@ -46,7 +46,7 @@ export class AlertasService {
   }
 
   /**
-   * Mapa ciudadano: alertas activas o creadas en las últimas `horas`.
+   * Mapa ciudadano: alertas creadas en las últimas `horas` (activas y atendidas).
    */
   async findForMap(horas = 24) {
     const windowHours = this.normalizeMapWindowHours(horas);
@@ -188,10 +188,7 @@ export class AlertasService {
       LEFT JOIN app.eventos ev ON ev.id = a.evento_id
       LEFT JOIN app.nodos nod ON nod.id = ev.nodo_id
       WHERE a.deleted_at IS NULL
-        AND (
-          a.estado = 'activa'
-          OR a.created_at >= NOW() - (${mapWindowHours} * INTERVAL '1 hour')
-        )
+        AND a.created_at >= NOW() - (${mapWindowHours} * INTERVAL '1 hour')
       ORDER BY a.created_at DESC
       LIMIT 100
     `;
@@ -372,7 +369,11 @@ export class AlertasService {
       updatedAt: row.updatedAt,
       timestamp: Number(row.timestamp),
       zona: row.zonaNombre
-        ? { nombre: row.zonaNombre, riesgoNivel: Number(row.zonaRiesgoNivel) }
+        ? {
+            id: row.zonaId,
+            nombre: row.zonaNombre,
+            riesgoNivel: Number(row.zonaRiesgoNivel),
+          }
         : null,
       latitud: row.latitud != null ? Number(row.latitud) : null,
       longitud: row.longitud != null ? Number(row.longitud) : null,
