@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateAlertaDto } from './dto/create-alerta.dto';
 import { UpdateAlertaDto } from './dto/update-alerta.dto';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
+import { reporteEstadoCierraCaso } from '../reportes/constants/reporte-estados';
 
 @Injectable()
 export class AlertasService {
@@ -387,6 +388,18 @@ export class AlertasService {
         updateDto.estado,
       );
 
+      let evidenciaMerged: string | undefined;
+      if (updateDto.evidenciaUrls) {
+        const current = await this.prisma.alerta.findUnique({
+          where: { id: updateDto.id },
+          select: { evidenciaUrls: true },
+        });
+        evidenciaMerged = this.mergeEvidenciaUrls(
+          current?.evidenciaUrls ?? null,
+          updateDto.evidenciaUrls,
+        );
+      }
+
       const data: any = {
         estado: updateDto.estado,
         notas: updateDto.notas,
@@ -396,8 +409,8 @@ export class AlertasService {
         data.comentarioCierre = updateDto.comentarioCierre;
       }
 
-      if (updateDto.evidenciaUrls !== undefined) {
-        data.evidenciaUrls = updateDto.evidenciaUrls;
+      if (evidenciaMerged !== undefined) {
+        data.evidenciaUrls = evidenciaMerged;
       }
 
       if (isReconocimiento) {
@@ -415,6 +428,12 @@ export class AlertasService {
         data,
       });
 
+      await this.syncLinkedReporte(
+        alerta,
+        updateDto.operadorId,
+        updateDto.notas ?? updateDto.comentarioCierre,
+      );
+
       this.natsClient.emit('alerta.updated', alerta);
 
       return alerta;
@@ -424,5 +443,97 @@ export class AlertasService {
         message: 'No se pudo actualizar la alerta',
       });
     }
+  }
+
+  /**
+   * Mantiene coherencia alerta ↔ reporte cuando la alerta tiene reporte_id.
+   */
+  private async syncLinkedReporte(
+    alerta: { id: string; reporteId: string | null; estado: string },
+    operadorId: string,
+    notas?: string,
+  ) {
+    if (!alerta.reporteId) return;
+
+    const reporte = await this.prisma.reporte.findFirst({
+      where: { id: alerta.reporteId, deletedAt: null },
+    });
+    if (!reporte) return;
+
+    if (reporteEstadoCierraCaso(reporte.estado) && alerta.estado !== 'reconocida') {
+      return;
+    }
+
+    let nuevoEstado: string | null = null;
+
+    if (alerta.estado === 'reconocida') {
+      if (reporte.estado === 'PENDIENTE') {
+        nuevoEstado = 'EN_PROCESO';
+      }
+    } else if (alerta.estado === 'falsa_alarma') {
+      nuevoEstado = 'FALSO';
+    } else if (['cerrada', 'completada'].includes(alerta.estado)) {
+      nuevoEstado = 'RESUELTO';
+    }
+
+    if (!nuevoEstado || reporte.estado === nuevoEstado) return;
+
+    const data: Record<string, unknown> = {
+      estado: nuevoEstado,
+      operadorId,
+    };
+
+    const notasSync = notas?.trim();
+    if (notasSync) {
+      data.notasOperador = notasSync;
+    }
+
+    if (reporteEstadoCierraCaso(nuevoEstado)) {
+      data.cerradoEn = new Date();
+    }
+
+    const updated = await this.prisma.reporte.update({
+      where: { id: reporte.id },
+      data,
+    });
+
+    this.natsClient.emit('reporte.updated', {
+      id: updated.id,
+      estado: updated.estado,
+      prioridad: updated.prioridad,
+      operadorId: updated.operadorId,
+      notasOperador: updated.notasOperador,
+      updatedAt: updated.updatedAt,
+    });
+
+    this.logger.log(
+      `Reporte ${reporte.id} sincronizado a ${nuevoEstado} (alerta ${alerta.id})`,
+    );
+  }
+
+  private mergeEvidenciaUrls(existing: string | null, incomingJson: string): string {
+    const parse = (raw: string | null): string[] => {
+      if (!raw?.trim()) return [];
+      try {
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr)
+          ? arr.filter((u): u is string => typeof u === 'string' && u.length > 0)
+          : [];
+      } catch {
+        return [];
+      }
+    };
+
+    let incoming: string[] = [];
+    try {
+      const arr = JSON.parse(incomingJson);
+      incoming = Array.isArray(arr)
+        ? arr.filter((u): u is string => typeof u === 'string' && u.length > 0)
+        : [];
+    } catch {
+      incoming = [];
+    }
+
+    return JSON.stringify([...new Set([...parse(existing), ...incoming])]);
   }
 }

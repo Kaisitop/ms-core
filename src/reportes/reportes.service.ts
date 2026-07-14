@@ -409,6 +409,15 @@ export class ReportesService {
         data,
       });
 
+      if (reporteEstadoCierraCaso(estado)) {
+        await this.syncLinkedAlertas(
+          updated.id,
+          estado,
+          updateDto.operadorId,
+          updateDto.notasOperador,
+        );
+      }
+
       this.natsClient.emit('reporte.updated', {
         id: updated.id,
         estado: updated.estado,
@@ -425,6 +434,52 @@ export class ReportesService {
         message: 'No se pudo actualizar el estado del reporte',
       });
     }
+  }
+
+  /** Cierra alertas abiertas vinculadas al reporte (RESUELTO / FALSO). */
+  private async syncLinkedAlertas(
+    reporteId: string,
+    estadoReporte: string,
+    operadorId?: string,
+    notasOperador?: string,
+  ) {
+    const alertaEstado = estadoReporte === 'FALSO' ? 'falsa_alarma' : 'cerrada';
+
+    const abiertas = await this.prisma.alerta.findMany({
+      where: {
+        reporteId,
+        deletedAt: null,
+        estado: { in: ['activa', 'reconocida'] },
+      },
+      select: { id: true, reconocidaPor: true },
+    });
+
+    if (abiertas.length === 0) return;
+
+    const notas =
+      notasOperador?.trim() || 'Cerrada al actualizar el reporte vinculado';
+
+    for (const alerta of abiertas) {
+      const operador =
+        operadorId ?? alerta.reconocidaPor ?? undefined;
+      if (!operador) {
+        this.logger.warn(
+          `No se cerró alerta ${alerta.id}: falta operadorId para sincronizar reporte ${reporteId}`,
+        );
+        continue;
+      }
+
+      await this.alertasService.updateStatus({
+        id: alerta.id,
+        estado: alertaEstado,
+        operadorId: operador,
+        notas,
+      });
+    }
+
+    this.logger.log(
+      `${abiertas.length} alerta(s) sincronizadas por cierre de reporte ${reporteId}`,
+    );
   }
 }
 
