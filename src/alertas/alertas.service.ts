@@ -388,14 +388,26 @@ export class AlertasService {
         updateDto.estado,
       );
 
+      const existing = await this.prisma.alerta.findUnique({
+        where: { id: updateDto.id },
+        select: { id: true, reporteId: true, estado: true, evidenciaUrls: true },
+      });
+
+      if (!existing) {
+        throw new RpcException({ status: 404, message: 'Alerta no encontrada' });
+      }
+
+      if (isReconocimiento && existing.estado !== 'activa') {
+        throw new RpcException({
+          status: 400,
+          message: `La alerta ya está en estado "${existing.estado}"`,
+        });
+      }
+
       let evidenciaMerged: string | undefined;
       if (updateDto.evidenciaUrls) {
-        const current = await this.prisma.alerta.findUnique({
-          where: { id: updateDto.id },
-          select: { evidenciaUrls: true },
-        });
         evidenciaMerged = this.mergeEvidenciaUrls(
-          current?.evidenciaUrls ?? null,
+          existing.evidenciaUrls ?? null,
           updateDto.evidenciaUrls,
         );
       }
@@ -438,6 +450,7 @@ export class AlertasService {
 
       return alerta;
     } catch (error) {
+      if (error instanceof RpcException) throw error;
       throw new RpcException({
         status: 400,
         message: 'No se pudo actualizar la alerta',
