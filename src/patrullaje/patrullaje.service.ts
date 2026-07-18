@@ -2,9 +2,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  FindNearestPatrulleroDto,
   FindPosicionesActivasDto,
   UpdatePosicionPatrulleroDto,
 } from './dto/update-posicion-patrullero.dto';
+import { haversineMeters } from '../common/geo.utils';
 
 const DEFAULT_MAX_AGE_SEC = 180;
 
@@ -75,5 +77,50 @@ export class PatrullajeService {
       precisionM: row.precisionM,
       updatedAt: row.updatedAt.toISOString(),
     }));
+  }
+
+  async findNearestPatrullero(dto: FindNearestPatrulleroDto) {
+    const positions = await this.findPosicionesActivas({
+      maxAgeSec: dto.maxAgeSec,
+    });
+
+    if (positions.length === 0) {
+      return null;
+    }
+
+    let nearest: (typeof positions)[number] | null = null;
+    let minDistance = Infinity;
+
+    for (const pos of positions) {
+      const dist = haversineMeters(
+        dto.latitud,
+        dto.longitud,
+        pos.latitud,
+        pos.longitud,
+      );
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearest = pos;
+      }
+    }
+
+    if (!nearest) {
+      return null;
+    }
+
+    const distanciaM = Math.round(minDistance);
+    this.logger.log(
+      `Patrullero más cercano: ${nearest.usuarioId} (${nearest.nombre ?? 'sin nombre'}) a ${distanciaM} m`,
+    );
+
+    return {
+      usuarioId: nearest.usuarioId,
+      nombre: nearest.nombre,
+      latitud: nearest.latitud,
+      longitud: nearest.longitud,
+      precisionM: nearest.precisionM,
+      updatedAt: nearest.updatedAt,
+      distanciaM,
+    };
   }
 }

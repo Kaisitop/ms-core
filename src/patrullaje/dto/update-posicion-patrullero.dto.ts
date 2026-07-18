@@ -29,3 +29,19 @@ export class FindPosicionesActivasDto {
   @IsNumber()
   maxAgeSec?: number;
 }
+
+export class FindNearestPatrulleroDto {
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitud: number;
+
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitud: number;
+
+  @IsOptional()
+  @IsNumber()
+  maxAgeSec?: number;
+}

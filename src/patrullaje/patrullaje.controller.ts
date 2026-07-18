@@ -2,6 +2,7 @@ import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { PatrullajeService } from './patrullaje.service';
 import {
+  FindNearestPatrulleroDto,
   FindPosicionesActivasDto,
   UpdatePosicionPatrulleroDto,
 } from './dto/update-posicion-patrullero.dto';
@@ -18,5 +19,10 @@ export class PatrullajeController {
   @MessagePattern('patrullaje.findPosicionesActivas')
   findPosicionesActivas(@Payload() payload?: FindPosicionesActivasDto) {
     return this.patrullajeService.findPosicionesActivas(payload);
+  }
+
+  @MessagePattern('patrullaje.findNearest')
+  findNearest(@Payload() payload: FindNearestPatrulleroDto) {
+    return this.patrullajeService.findNearestPatrullero(payload);
   }
 }

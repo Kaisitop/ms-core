@@ -9,6 +9,7 @@ import { AlertasModule } from './alertas/alertas.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { PatrullajeModule } from './patrullaje/patrullaje.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PatrullajeModule } from './patrullaje/patrullaje.module';
     NotificacionesModule,
     AnalyticsModule,
     PatrullajeModule,
+    MaintenanceModule,
   ],
 })
 export class AppModule {}
