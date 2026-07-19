@@ -386,6 +386,7 @@ export class AlertasService {
 
   async updateStatus(updateDto: UpdateAlertaDto) {
     try {
+      const isEnProceso = updateDto.estado === 'en_proceso';
       const isReconocimiento = updateDto.estado === 'reconocida';
       const isCierre = ['cerrada', 'falsa_alarma', 'completada'].includes(
         updateDto.estado,
@@ -400,7 +401,17 @@ export class AlertasService {
         throw new RpcException({ status: 404, message: 'Alerta no encontrada' });
       }
 
-      if (isReconocimiento && existing.estado !== 'activa') {
+      if (isEnProceso && existing.estado !== 'activa') {
+        throw new RpcException({
+          status: 400,
+          message: `Solo se puede marcar en camino desde estado activa (actual: "${existing.estado}")`,
+        });
+      }
+
+      if (
+        isReconocimiento &&
+        !['activa', 'en_proceso'].includes(existing.estado)
+      ) {
         throw new RpcException({
           status: 400,
           message: `La alerta ya está en estado "${existing.estado}"`,
@@ -426,6 +437,10 @@ export class AlertasService {
 
       if (evidenciaMerged !== undefined) {
         data.evidenciaUrls = evidenciaMerged;
+      }
+
+      if (isEnProceso) {
+        data.reconocidaPor = updateDto.operadorId;
       }
 
       if (isReconocimiento) {
@@ -476,14 +491,18 @@ export class AlertasService {
     });
     if (!reporte) return;
 
-    if (reporteEstadoCierraCaso(reporte.estado) && alerta.estado !== 'reconocida') {
+    if (reporteEstadoCierraCaso(reporte.estado) && !['reconocida', 'en_proceso'].includes(alerta.estado)) {
       return;
     }
 
     let nuevoEstado: string | null = null;
 
-    if (alerta.estado === 'reconocida') {
+    if (alerta.estado === 'en_proceso') {
       if (reporte.estado === 'PENDIENTE') {
+        nuevoEstado = 'EN_PROCESO';
+      }
+    } else if (alerta.estado === 'reconocida') {
+      if (reporte.estado === 'PENDIENTE' || reporte.estado === 'EN_PROCESO') {
         nuevoEstado = 'EN_PROCESO';
       }
     } else if (alerta.estado === 'falsa_alarma') {

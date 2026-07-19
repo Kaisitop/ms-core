@@ -161,7 +161,7 @@ model Alerta {
 
   severidad Int @default(1) @db.SmallInt
 
-  /// activa | reconocida | cerrada | falsa_alarma | completada
+  /// activa | en_proceso | reconocida | cerrada | falsa_alarma | completada
   estado String @default("activa") @db.VarChar(20)
 
   /// JSON array de URLs o data-URLs de evidencia fotográfica al cierre

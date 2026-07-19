@@ -449,7 +449,7 @@ export class ReportesService {
       where: {
         reporteId,
         deletedAt: null,
-        estado: { in: ['activa', 'reconocida'] },
+        estado: { in: ['activa', 'en_proceso', 'reconocida'] },
       },
       select: { id: true, reconocidaPor: true },
     });

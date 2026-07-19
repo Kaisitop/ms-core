@@ -11,7 +11,7 @@ const MIN_IA_CONFIDENCE = 0.85;
 
 const CRITICAL_SUBTIPOS = ['disparo', 'grito'] as const;
 
-const OPEN_ALERT_STATES = ['activa', 'reconocida'] as const;
+const OPEN_ALERT_STATES = ['activa', 'en_proceso', 'reconocida'] as const;
 
 export interface ConfirmacionAlertaParams {
   eventoId: string;

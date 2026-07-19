@@ -1,8 +1,10 @@
 # ms-core - Guia tecnica y patrones NATS
 
-`ms-core` contiene la logica operativa de CENTINELA: zonas, nodos moviles, eventos de audio, reportes ciudadanos y alertas.
+> **Monorepo:** [README.md](../README.md) · [docs/contexto.md](../docs/contexto.md)
 
-Este microservicio no expone HTTP directamente. Consume mensajes NATS enviados por `client-gateway` o por un futuro bridge MQTT.
+`ms-core` contiene la logica operativa de CENTINELA: zonas, nodos moviles, eventos de audio, reportes ciudadanos, alertas y patrullaje GPS.
+
+**Capacidades recientes:** estado alerta `en_proceso`, patrullero más cercano (`patrullaje.findNearest`), posiciones GPS, purge operativo (`maintenance.purgeAppData`), sincronización alerta ↔ reporte.
 
 ## Prototipo de titulacion
 
@@ -65,6 +67,8 @@ Regla para eventos:
 4. Si no hay zona y existe nodoId, se usa nodo.zonaId como fallback.
 5. Si severidad >= 2 o subtipo es disparo/grito, se crea alerta.
 ```
+
+Escala de severidad (1–5): reportes ciudadanos usan el catálogo de `src/reportes/constants/reporte-tipos.ts` (pánico/homicidio/secuestro = 4, robo/extorsión = 3, sospechosos = 2); los eventos de audio usan la sugerida por ms-ia (disparo = 3, grito = 2, normal = 1). Justificación en `docs/contexto.md` del monorepo.
 
 ## Patrones NATS
 
@@ -264,7 +268,19 @@ pendiente | en_proceso | resuelto | falso
 | `alertas.create` | `CreateAlertaDto` | Crea alerta operativa |
 | `alertas.findAll` | `{}` | Lista alertas (incluye `evidenciaUrls` y `reporte.fotosUrls`) |
 | `alertas.findOne` | `{ id }` | Detalle completo con evidencia y fotos del reporte vinculado |
-| `alertas.updateStatus` | `UpdateAlertaDto` | Reconoce o cierra alerta |
+| `alertas.updateStatus` | `UpdateAlertaDto` | Cambia estado (activa, en_proceso, reconocida, cerrada, …) |
+
+Estados de alerta:
+
+```text
+activa → en_proceso → reconocida → cerrada | falsa_alarma | completada
+```
+
+| Pattern | Payload | Descripcion |
+|---|---|---|
+| `patrullaje.updatePosicion` | `{ latitud, longitud, … }` | GPS patrullero |
+| `patrullaje.findNearest` | `{ latitud, longitud }` | Patrullero más cercano |
+| `maintenance.purgeAppData` | `{ requestedBy }` | Limpia datos operativos (admin) |
 
 **Campo `evidenciaUrls`:** se persiste en `app.alertas.evidencia_urls` como JSON array de URLs Cloudinary (evidencia policial al cerrar). En `findOne`, el reporte anidado expone `fotosUrls` del ciudadano cuando `reporte_id` está presente.
 
